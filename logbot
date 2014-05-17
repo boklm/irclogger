@@ -1,0 +1,116 @@
+#!/usr/bin/perl -w
+use strict;
+use warnings;
+
+package SomeBot;
+use base 'Bot::BasicBot';
+use IO::Handle;
+use DateTime;
+
+my %logfiles;
+
+sub get_date {
+    my $dt = DateTime->now;
+    return '[' . $dt->ymd . ' ' . $dt->hms . ']';
+}
+
+sub init {
+    my ($bot) = @_;
+    my $logdir = defined $bot->{logdir} ? $bot->{logdir} : '.';
+    mkdir $logdir;
+    foreach my $channel (@{$bot->{channels}}) {
+        open(my $lfile, '>>:encoding(utf8)', "$logdir/$channel.log")
+                || die "Error opening log file $logdir/$channel.log";
+        my $date = get_date;
+        print $lfile "$date connect\n";
+        $lfile->flush();
+        $logfiles{$channel} = $lfile;
+    }
+    open(my $l, '>>:encoding(utf8)', "$logdir/msg.log");
+    $logfiles{msg} = $l;
+    return 1;
+}
+
+sub log_chan {
+    my ($chan, $l) = @_;
+    my $date = get_date;
+    my $out = $logfiles{$chan};
+    if (!$out) {
+        print "Unknown channel $chan\n";
+        return;
+    }
+    print $out "$date $l\n";
+    $out->flush();
+}
+
+sub said {
+    my ($bot, $p) = @_;
+    log_chan($p->{channel}, "say $p->{who}: $p->{body}");
+    return undef;
+}
+
+sub noticed {
+    my ($bot, $p) = @_;
+    log_chan($p->{channel}, "notice $p->{who}: $p->{body}");
+    return undef;
+}
+
+sub emoted {
+    my ($bot, $p) = @_;
+    log_chan($p->{channel}, "me $p->{who}: $p->{body}");
+    return undef;
+}
+
+sub chanjoin {
+    my ($bot, $p) = @_;
+    log_chan($p->{channel}, "join $p->{who}");
+    return undef;
+}
+
+sub chanpart {
+    my ($bot, $p) = @_;
+    log_chan($p->{channel}, "part $p->{who}");
+    return undef;
+}
+
+sub topic {
+    my ($bot, $p) = @_;
+    return unless $p->{topic};
+    return unless $p->{who};
+    log_chan($p->{channel}, "topic $p->{who}: $p->{topic}");
+    return undef;
+}
+
+sub nick_change {
+    my ($bot, $p) = @_;
+    log_chan($p->{channel}, "nick $p->{from} -> $p->{to}");
+    return undef;
+}
+
+sub kicked {
+    my ($bot, $p) = @_;
+    log_chan($p->{channel}, "kicked $p->{kicked}: by $p->{who} reason $p->{reason}");
+    return undef;
+}
+
+sub userquit {
+    my ($bot, $p) = @_;
+    log_chan($p->{channel}, "quit $p->{who}: $p->{body}");
+    return undef;
+}
+
+sub help {
+    return undef;
+}
+
+package main;
+use YAML qw(LoadFile);
+
+sub usage {
+    print STDERR "usage: $0 <config_file>\n";
+    exit 1;
+}
+
+usage unless @ARGV == 1;
+my $bot_config = LoadFile($ARGV[0]);
+SomeBot->new(%$bot_config)->run();

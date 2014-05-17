@@ -1,0 +1,12 @@
+server: irc.freenode.net
+port: 6667
+channels:
+  - '#channel1'
+  - '#channel2'
+nick: something
+alt_nicks:
+  - something_
+  - something__
+username: chanlog
+name: "Channel Logger"
+logdir: /tmp/irc
